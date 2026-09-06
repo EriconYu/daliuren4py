@@ -12609,23 +12609,22 @@ var TIAN_JIANG_SHORT = {
   \u5929\u540E: "\u540E"
 };
 var CHANG_SHENG_NAMES = ["\u957F\u751F", "\u6C90\u6D74", "\u51A0\u5E26", "\u4E34\u5B98", "\u5E1D\u65FA", "\u8870", "\u75C5", "\u6B7B", "\u5893", "\u7EDD", "\u80CE", "\u517B"];
-var YANG_CHANG_SHENG_START = {
-  \u6728: zhiIndex("\u4EA5"),
-  // 甲木长生在亥
-  \u706B: zhiIndex("\u5BC5"),
-  // 丙火长生在寅
-  \u571F: zhiIndex("\u5BC5"),
-  // 戊土长生在寅（同火）
-  \u91D1: zhiIndex("\u5DF3"),
-  // 庚金长生在巳
-  \u6C34: zhiIndex("\u7533")
-  // 壬水长生在申
+var CHANG_SHENG_START = {
+  \u7532: zhiIndex("\u4EA5"),
+  \u4E59: zhiIndex("\u5348"),
+  \u4E19: zhiIndex("\u5BC5"),
+  \u4E01: zhiIndex("\u9149"),
+  \u620A: zhiIndex("\u5BC5"),
+  \u5DF1: zhiIndex("\u9149"),
+  \u5E9A: zhiIndex("\u5DF3"),
+  \u8F9B: zhiIndex("\u5B50"),
+  \u58EC: zhiIndex("\u7533"),
+  \u7678: zhiIndex("\u536F")
 };
 function getChangSheng(riGan, diZhi) {
-  const wx = GAN_WUXING[riGan];
-  if (!wx) return "";
+  if (!GAN_WUXING[riGan]) return "";
   const isYang = ganYinYang(riGan) === "\u9633";
-  const start = YANG_CHANG_SHENG_START[wx];
+  const start = CHANG_SHENG_START[riGan];
   const pos = zhiIndex(diZhi);
   if (isYang) {
     const offset = (pos - start + 12) % 12;
@@ -12780,13 +12779,7 @@ function shengRelation(a, b) {
   return SHENG_MAP[a] === b;
 }
 function generateKeName(riGanZhi, ganYang) {
-  const juNum = (zhiIndex(ganYang) - zhiIndex("\u4EA5") + 12) % 12 + 1;
-  const juStr = numToChinese(juNum);
-  return `${riGanZhi}\u65E5\u7B2C${juStr}\u5C40 \u5E72\u4E0A${ganYang}`;
-}
-function numToChinese(n) {
-  const nums = ["", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D", "\u4E03", "\u516B", "\u4E5D", "\u5341", "\u5341\u4E00", "\u5341\u4E8C"];
-  return nums[n] || String(n);
+  return `${riGanZhi}\u65E5 \u5E72\u4E0A${ganYang}`;
 }
 function calcBenMingXingNian(birthYear, currentYear, gender) {
   const benMingGanIdx = ((birthYear - 4) % 10 + 10) % 10;
@@ -12807,13 +12800,66 @@ function calcBenMingXingNian(birthYear, currentYear, gender) {
 }
 
 // src/domains/daliuren/calculate.ts
+var ALGORITHM_VERSION = "daliuren-shizhan-v1";
+var YUE_JIANG_BY_TERM = {
+  \u96E8\u6C34: "\u4EA5",
+  \u60CA\u86F0: "\u4EA5",
+  \u6625\u5206: "\u620C",
+  \u6E05\u660E: "\u620C",
+  \u8C37\u96E8: "\u9149",
+  \u7ACB\u590F: "\u9149",
+  \u5C0F\u6EE1: "\u7533",
+  \u8292\u79CD: "\u7533",
+  \u590F\u81F3: "\u672A",
+  \u5C0F\u6691: "\u672A",
+  \u5927\u6691: "\u5348",
+  \u7ACB\u79CB: "\u5348",
+  \u5904\u6691: "\u5DF3",
+  \u767D\u9732: "\u5DF3",
+  \u79CB\u5206: "\u8FB0",
+  \u5BD2\u9732: "\u8FB0",
+  \u971C\u964D: "\u536F",
+  \u7ACB\u51AC: "\u536F",
+  \u5C0F\u96EA: "\u5BC5",
+  \u5927\u96EA: "\u5BC5",
+  \u51AC\u81F3: "\u4E11",
+  \u5C0F\u5BD2: "\u4E11",
+  \u5927\u5BD2: "\u5B50",
+  \u7ACB\u6625: "\u5B50"
+};
 var liurenInternal = esm_exports;
 function calculateDaliurenData(input) {
   const { date, hour, minute = 0, question, birthYear, gender } = input;
   const timezone = input.timezone || DEFAULT_DIVINATION_TIMEZONE;
+  assertValidInput(input);
   const [y, m, d] = date.split("-").map(Number);
   const dateObj = zonedWallClockToSystemDate({ year: y, month: m, day: d, hour, minute }, timezone);
-  const raw = getLiuRenByDate(dateObj);
+  let raw = getLiuRenByDate(dateObj);
+  const preciseTerm = SolarTime.fromYmdHms(y, m, d, hour, minute, 0).getTerm().toString();
+  const preciseYueJiang = YUE_JIANG_BY_TERM[preciseTerm];
+  if (raw.dateInfo && preciseYueJiang && raw.dateInfo.yuejiang !== preciseYueJiang) {
+    const correctedDateInfo = { ...raw.dateInfo, yuejiang: preciseYueJiang };
+    const tianDiPan2 = liurenInternal.getTianDiPan(correctedDateInfo);
+    const siKe2 = liurenInternal.getSiKe(correctedDateInfo, tianDiPan2);
+    const dunGan = liurenInternal.getDunGan(correctedDateInfo, tianDiPan2);
+    const riGan2 = correctedDateInfo.bazi.split(" ")[2]?.[0] || "\u7532";
+    raw = {
+      ...raw,
+      dateInfo: correctedDateInfo,
+      tiandipan: tianDiPan2,
+      siKe: siKe2,
+      dunGan,
+      jianChu: liurenInternal.getJianChu(correctedDateInfo, tianDiPan2),
+      sanChuan: liurenInternal.fillSanChuan(
+        liurenInternal.getSanChuan(siKe2, tianDiPan2),
+        tianDiPan2,
+        dunGan,
+        riGan2
+      ),
+      shenSha: liurenInternal.getShenSha(correctedDateInfo),
+      yinYangGuiRen: liurenInternal.getYinYangGuiRen(correctedDateInfo, tianDiPan2)
+    };
+  }
   const bazi = raw.dateInfo?.bazi || "";
   const baziParts = bazi.split(" ");
   const riGanZhi = baziParts[2] || "";
@@ -12822,7 +12868,8 @@ function calculateDaliurenData(input) {
   const yueGanZhi = baziParts[1] || "";
   const yueZhi = yueGanZhi[1] || "\u5B50";
   const yueJiang = raw.dateInfo?.yuejiang || "\u4EA5";
-  const diurnal = hour >= 5 && hour < 19;
+  const hourBranch = baziParts[3]?.[1] || "";
+  const diurnal = ["\u536F", "\u8FB0", "\u5DF3", "\u5348", "\u672A", "\u7533"].includes(hourBranch);
   const dateInfo = {
     solarDate: raw.dateInfo?.date || `${y}\u5E74${m}\u6708${d}\u65E5 ${hour}\u65F6${minute}\u5206`,
     bazi,
@@ -12936,6 +12983,7 @@ function calculateDaliurenData(input) {
     xingNian = result.xingNian;
   }
   return {
+    algorithmVersion: ALGORITHM_VERSION,
     dateInfo,
     tianDiPan,
     siKe,
@@ -12950,6 +12998,22 @@ function calculateDaliurenData(input) {
     xingNian,
     question
   };
+}
+function assertValidInput(input) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error("date \u5FC5\u987B\u662F YYYY-MM-DD");
+  const [year, month, day] = input.date.split("-").map(Number);
+  if (!Number.isInteger(input.hour) || input.hour < 0 || input.hour > 23) throw new Error("hour \u5FC5\u987B\u5728 0 \u5230 23 \u4E4B\u95F4");
+  if (!Number.isInteger(input.minute ?? 0) || (input.minute ?? 0) < 0 || (input.minute ?? 0) > 59) {
+    throw new Error("minute \u5FC5\u987B\u5728 0 \u5230 59 \u4E4B\u95F4");
+  }
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (year < 1900 || year > 2100 || parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    throw new Error("\u65E5\u671F\u65E0\u6548\uFF0C\u652F\u6301\u8303\u56F4\u4E3A 1900 \u5230 2100 \u5E74");
+  }
+  if (input.birthYear != null && (!Number.isInteger(input.birthYear) || input.birthYear < 1900 || input.birthYear > year)) {
+    throw new Error("birthYear \u65E0\u6548");
+  }
+  if (input.gender != null && !["male", "female"].includes(input.gender)) throw new Error("gender \u65E0\u6548");
 }
 function extractShangShen(ke) {
   if (!ke || ke.length === 0) return "";
@@ -12985,6 +13049,7 @@ function renderDaliurenCanonicalJSON(result, options = {}) {
     if (result.benMing) basicInfo.\u672C\u547D = result.benMing;
     if (result.xingNian) basicInfo.\u884C\u5E74 = result.xingNian;
     if (result.keTi.extraTypes.length > 0) basicInfo.\u9644\u52A0\u8BFE\u4F53 = [...result.keTi.extraTypes];
+    basicInfo.\u7B97\u6CD5\u7248\u672C = result.algorithmVersion;
   }
   const keLabels = ["\u4E00\u8BFE (\u5E72\u4E0A)", "\u4E8C\u8BFE (\u5E72\u9634)", "\u4E09\u8BFE (\u652F\u4E0A)", "\u56DB\u8BFE (\u652F\u9634)"];
   const keData = [result.siKe.yiKe, result.siKe.erKe, result.siKe.sanKe, result.siKe.siKe];
