@@ -1,6 +1,6 @@
 # daliuren4py
 
-Python 大六壬排盘 SDK，包内自带经过版本锁定的排盘引擎。要求 Python 3.9+ 和 Node.js 20+。
+Python 原生大六壬排盘 SDK，历法使用 `lunar-python`，三传使用包内规则表。运行时不依赖 Node.js 或其他语言。
 
 ```python
 from daliuren4py import calculate, canonical

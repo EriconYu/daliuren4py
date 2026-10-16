@@ -12,4 +12,4 @@ def test_boundaries():
     assert calculate({'date':'2026-02-18','hour':23,'minute':55,'timezone':'Asia/Shanghai'})['dateInfo']['yueJiang']=='亥'
     assert calculate({'date':'2026-09-04','hour':18,'timezone':'Asia/Shanghai'})['dateInfo']['diurnal'] is False
 def test_invalid_date():
-    with pytest.raises(RuntimeError,match='日期无效'): calculate({'date':'2026-02-30','hour':12})
+    with pytest.raises(ValueError,match='日期无效'): calculate({'date':'2026-02-30','hour':12})
